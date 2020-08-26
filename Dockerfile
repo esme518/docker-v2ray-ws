@@ -2,26 +2,22 @@
 # Dockerfile for v2ray with WebSocket
 #
 
-FROM ubuntu:latest as builder
+FROM golang:alpine as builder
 
-RUN apt-get update
-RUN apt-get install curl -y
-RUN curl -L -o /tmp/go.sh https://install.direct/go.sh
-RUN chmod +x /tmp/go.sh
-RUN /tmp/go.sh
+RUN apk update && apk add --no-cache git bash wget curl
+WORKDIR /go/src/v2ray.com/core
+RUN git clone --progress https://github.com/v2fly/v2ray-core.git . && \
+    bash ./release/user-package.sh nosource noconf codename=$(git describe --tags) buildname=docker-fly abpathtgz=/tmp/v2ray.tgz
 
 FROM alpine:latest
 
-COPY --from=builder /usr/bin/v2ray/v2ray /usr/bin/v2ray/
-COPY --from=builder /usr/bin/v2ray/v2ctl /usr/bin/v2ray/
-COPY --from=builder /usr/bin/v2ray/geoip.dat /usr/bin/v2ray/
-COPY --from=builder /usr/bin/v2ray/geosite.dat /usr/bin/v2ray/
+COPY --from=builder /tmp/v2ray.tgz /tmp
 
 RUN set -ex && \
     apk --no-cache add ca-certificates && \
     mkdir /var/log/v2ray/ &&\
-    chmod +x /usr/bin/v2ray/v2ctl && \
-    chmod +x /usr/bin/v2ray/v2ray && \
+    mkdir -p /usr/bin/v2ray && \
+    tar xvfz /tmp/v2ray.tgz -C /usr/bin/v2ray && \
     rm -rf /var/cache/apk
 
 COPY config.json /etc/v2ray/config.json
